@@ -20,6 +20,17 @@
 
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __MAIN_H
+
+
+
+//#include "fatfs.h"
+
+#include "stm32h7xx_hal.h"
+
+//#include "canlib.h"
+//#include "stm32h7_can.h"
+
+
 #define __MAIN_H
 
 #ifdef __cplusplus
@@ -27,7 +38,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32h7xx_hal.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -51,7 +62,7 @@ extern "C" {
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
-
+//void can_callback(const can_msg_t *msg);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

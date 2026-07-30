@@ -18,10 +18,17 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "fatfs.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "canlib.h"
+#include "stm32h7_can.h"
+
+//#include "fatfs.h"
 
 /* USER CODE END Includes */
 
@@ -32,6 +39,16 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LED_GPIO_PORTS GPIOE
+
+#define LED1_PIN GPIO_PIN_2
+#define LED2_PIN GPIO_PIN_3
+#define LED3_PIN GPIO_PIN_4
+#define LED4_PIN GPIO_PIN_5
+#define LED5_PIN GPIO_PIN_6
+
+#define ACCEL_READ_CMD 0x80
+#define ACCEL_DATA_START 0x08
 
 /* USER CODE END PD */
 
@@ -65,28 +82,100 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_I2C1_SMBUS_Init(void);
-static void MX_SDMMC1_SD_Init(void);
+//static void MX_SDMMC1_SD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
-
+void can_callback(const can_msg_t *msg);
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi);
+void build_general_msg(can_msg_prio_t prio, can_msg_type_t message_type, uint16_t timestamp, can_msg_t *output);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+volatile bool seen_can_msg = false;
+
+uint8_t tx_buff[7] = {0x00};
+uint8_t rx_buff[7];
+uint8_t *temp_address;
+
+
+
+/* USER CODE BEGIN 0 */
+void can_callback(const can_msg_t *msg) {
+  seen_can_msg = true;
+  /*if (get_board_type_unique_id(msg) == BOARD_TYPE_UNIQUE_ID) {
+    return;
+  }*/
+
+  switch (get_message_type(msg)) {
+    case MSG_LEDS_ON:
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
+      break;
+
+    case MSG_LEDS_OFF:
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
+      break;
+
+    case MSG_GENERAL_BOARD_STATUS:
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
+      break;
+
+    default:
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
+      break;
+  }
+}
 /* USER CODE END 0 */
 
 /**
   * @brief  The application entry point.
   * @retval int
   */
+void build_general_msg(can_msg_prio_t prio, can_msg_type_t message_type, uint16_t timestamp, can_msg_t *output) {
+	w_assert(output);
+
+	output->sid = build_sid(prio, message_type, 0);
+	write_timestamp(timestamp, output);
+	output->data_len = 2;
+  
+}
+void build_LED_OFF_msg(can_msg_prio_t prio, uint16_t timestamp,
+									uint32_t board_error_bitfield, can_msg_t *output) {
+	w_assert(output);
+
+	output->sid = build_sid(prio, MSG_LEDS_OFF, 0);
+	write_timestamp(timestamp, output);
+	output->data[2] = (board_error_bitfield >> 24) & 0xff;
+	output->data[3] = (board_error_bitfield >> 16) & 0xff;
+	output->data[4] = (board_error_bitfield >> 8) & 0xff;
+	output->data[5] = board_error_bitfield & 0xff;
+	output->data_len = 6;
+}
 int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+ tx_buff[0] = ACCEL_READ_CMD | ACCEL_DATA_START;
+ 
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -110,29 +199,110 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
   MX_DMA_Init();
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
   MX_FDCAN1_Init();
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
   MX_I2C1_SMBUS_Init();
-  MX_SDMMC1_SD_Init();
-  MX_FATFS_Init();
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+  //MX_SDMMC1_SD_Init();
+  //MX_FATFS_Init();
   MX_ADC1_Init();
   MX_SPI3_Init();
   MX_SPI1_Init();
+
+  
+
   /* USER CODE BEGIN 2 */
+  stm32h7_can_init(&hfdcan1, &can_callback);
 
+  const can_msg_t LED_ON_MESSAGE; 
+  const can_msg_t LED_OFF_MESSAGE; 
+  const can_msg_t Status_Test_Msg;
+
+  //build_general_msg(0x0, MSG_LEDS_ON, 0x00, &LED_ON_MESSAGE);
+  //build_general_msg(0x0, MSG_LEDS_OFF, 0x00, &LED_OFF_MESSAGE);
+  
+  build_general_board_status_msg(0x0, 0xFF00, 0xFFFF0000, &Status_Test_Msg);
+  build_LED_OFF_msg(0x0, 0xFF00, 0xFFFF0000, &LED_OFF_MESSAGE);
+
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
   /* USER CODE END 2 */
+  //can_callback(&LED_ON_MESSAGE);
 
+ // HAL_SPI_TransmitReceive_DMA(&hspi1, tx_buff, rx_buff, 7);
+ // tx_buff[0] = 0x07;
+  //tx_buff[1] = 0xFF;
+  //tx_buff[2] = 0x00;
+  //tx_buff[3] = 0xFF;
+ // tx_buff[4] = 0xFF;
+  //tx_buff[5] = 0x00;
+  //tx_buff[6] = 0x07;
+
+ temp_address = &tx_buff[0];
+
+ HAL_GPIO_WritePin(GPIOE , GPIO_PIN_4, GPIO_PIN_RESET);
+
+ // chis select
+ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+ HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
+ HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
+ //HAL_SPI_Transmit_IT(&hspi1, temp_address, 3);
+  
+  //HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 7);
+  HAL_Delay(500);
+  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+
+  
+
+  while(1){
+  HAL_SPI_Transmit(&hspi1, temp_address, 7, 500);
+  // HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 7);
+  //HAL_Delay(100);
+  //HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED4_PIN);
+  //stm32h7_can_send(&Status_Test_Msg);
+  HAL_Delay(200);
+
+    //stm32h7_can_send(&LED_OFF_MESSAGE);
+    //HAL_Delay(200);
+    
+  //can_callback(&LED_OFF_MESSAGE);
+    //HAL_Delay(500);
+    //build_general_msg(0x0, MSG_LEDS_ON, 0xFFFFFFFF, &LED_ON_MESSAGE);
+    //build_general_msg(0x0, MSG_LEDS_OFF, 0xFFFFFFFF, &LED_OFF_MESSAGE);
+    
+    //HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_SET);
+    //stm32h7_can_send(&LED_OFF_MESSAGE);
+    //HAL_Delay(500);
+    //HAL_GPIO_WritePin(GPIOE, GPIO_PIN_4, GPIO_PIN_RESET);
+    //stm32h7_can_send(&LED_ON_MESSAGE);
+    //HAL_Delay(500);
+  }
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-    /* USER CODE END WHILE */
-
-    /* USER CODE BEGIN 3 */
-  }
+ 
   /* USER CODE END 3 */
 }
 
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
+HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED5_PIN);
+ // HAL_SPI_Transmit_IT(&hspi1, temp_address, 7);
+    
+  
+    
+    
+ // }
+}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -280,10 +450,11 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  //hfdcan1.Init.Mode = FDCAN_MODE_INTERNAL_LOOPBACK;
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 16;
+  hfdcan1.Init.NominalPrescaler = 32;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
   hfdcan1.Init.NominalTimeSeg1 = 1;
   hfdcan1.Init.NominalTimeSeg2 = 1;
@@ -294,21 +465,22 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.MessageRAMOffset = 0;
   hfdcan1.Init.StdFiltersNbr = 0;
   hfdcan1.Init.ExtFiltersNbr = 0;
-  hfdcan1.Init.RxFifo0ElmtsNbr = 0;
+  hfdcan1.Init.RxFifo0ElmtsNbr = 64;
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.RxFifo1ElmtsNbr = 0;
   hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
-  hfdcan1.Init.TxEventsNbr = 0;
+  hfdcan1.Init.TxEventsNbr = 32;
   hfdcan1.Init.TxBuffersNbr = 0;
-  hfdcan1.Init.TxFifoQueueElmtsNbr = 0;
+  hfdcan1.Init.TxFifoQueueElmtsNbr = 32;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   hfdcan1.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
   {
     Error_Handler();
   }
+
   /* USER CODE BEGIN FDCAN1_Init 2 */
 
   /* USER CODE END FDCAN1_Init 2 */
@@ -417,11 +589,11 @@ static void MX_SPI1_Init(void)
   hspi1.Instance = SPI1;
   hspi1.Init.Mode = SPI_MODE_MASTER;
   hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -465,11 +637,11 @@ static void MX_SPI3_Init(void)
   hspi3.Instance = SPI3;
   hspi3.Init.Mode = SPI_MODE_MASTER;
   hspi3.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi3.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi3.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -536,7 +708,7 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_2|GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5
                           |GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9
-                          |GPIO_PIN_1, GPIO_PIN_RESET);
+                          |GPIO_PIN_1, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
@@ -632,6 +804,10 @@ void MPU_Config(void)
   HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
 
 }
+
+/* Handler for CAN messages. */
+
+
 
 /**
   * @brief  This function is executed in case of error occurrence.
