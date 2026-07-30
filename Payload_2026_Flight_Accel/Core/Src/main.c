@@ -28,6 +28,8 @@
 #include "canlib.h"
 #include "stm32h7_can.h"
 
+#include "KX132.h"
+
 //#include "fatfs.h"
 
 /* USER CODE END Includes */
@@ -248,30 +250,33 @@ int main(void)
 
  HAL_GPIO_WritePin(GPIOE , GPIO_PIN_4, GPIO_PIN_RESET);
 
- // chis select
- HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
- HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
- HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
- //HAL_SPI_Transmit_IT(&hspi1, temp_address, 3);
-  
-  //HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 7);
+ // chip select
+ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET); // J8 Chip Select
+ HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET); // J7 Chip Select
+ HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
+ HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET); // J4 Chip Select
+ HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET); // J10 Chip Select
+ HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET); // J11 Chip Select
+ HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); // J9 Chip Select
+ HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); // J3 Chip Select
+
   HAL_Delay(500);
   HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
 
-  
+  // Take accelerometers out of standby and configure
+  configure_accels(&hspi1, &hspi3);
 
   while(1){
-  HAL_SPI_Transmit(&hspi1, temp_address, 7, 500);
+
+  read_accels(&hspi1, &hspi3, &rx_buff[0]);
+
+
+  //HAL_SPI_Transmit(&hspi1, &tx_buff[0], 8, 500);
   // HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 7);
   //HAL_Delay(100);
   //HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED4_PIN);
   //stm32h7_can_send(&Status_Test_Msg);
-  HAL_Delay(200);
+  HAL_Delay(2000);
 
     //stm32h7_can_send(&LED_OFF_MESSAGE);
     //HAL_Delay(200);
