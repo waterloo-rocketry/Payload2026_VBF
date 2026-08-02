@@ -39,6 +39,8 @@ void MX_FATFS_Init(void)
   retUSER = FATFS_LinkDriver(&USER_Driver, USERPath);
 
   /* USER CODE BEGIN Init */
+  FRESULT res = f_mount(&SDFatFS, (TCHAR const*)SDPath, 0);
+
   /* additional user code for init */
   /* USER CODE END Init */
 }

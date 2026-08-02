@@ -96,6 +96,8 @@ static void MX_SDMMC1_SD_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI3_Init(void);
 static void MX_SPI1_Init(void);
+
+
 /* USER CODE BEGIN PFP */
 void can_callback(const can_msg_t *msg);
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi);
@@ -109,21 +111,9 @@ volatile bool seen_can_msg = false;
 
 uint8_t tx_buff[7] = {0x00};
 uint8_t rx_buff[7];
+UINT bytesWritten;
 uint8_t samples_to_read;
 uint8_t *temp_address;
-
-
-
-
-
-
-
-FATFS myFATFS;           /* File system object */
-FIL myFile;              /* File object */
-UINT bytesWritten;       /* Number of bytes written */
-char logData[] = "Holy moly :O\r\n";
-
-
 
 
 
@@ -199,6 +189,8 @@ void build_LED_OFF_msg(can_msg_prio_t prio, uint16_t timestamp,
 	output->data[5] = board_error_bitfield & 0xff;
 	output->data_len = 6;
 }
+
+
 int main(void)
 {
 
@@ -236,18 +228,27 @@ int main(void)
   MX_I2C1_SMBUS_Init();
   HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
 
-
+ HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
   MX_SDMMC1_SD_Init();
-  MX_FATFS_Init();
+
+ HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
+ HAL_Delay(500);
+  
 
 
   MX_ADC1_Init();
   MX_SPI3_Init();
   MX_SPI1_Init();
+  MX_FATFS_Init();
 
   
 
   /* USER CODE BEGIN 2 */
+
+  char logData[] = "Holier molier :O\r\n";
+
+
+  
   stm32h7_can_init(&hfdcan1, &can_callback);
 
   const can_msg_t LED_ON_MESSAGE; 
@@ -279,8 +280,6 @@ int main(void)
 
  temp_address = &tx_buff[0];
 
- HAL_GPIO_WritePin(GPIOE , GPIO_PIN_4, GPIO_PIN_RESET);
-
  // chip select
  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET); // J8 Chip Select
  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET); // J7 Chip Select
@@ -291,53 +290,79 @@ int main(void)
  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET); // J9 Chip Select
  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET); // J3 Chip Select
 
+
+ // Turn off all LEDS
+   HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
+
   HAL_Delay(500);
-  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+
 
   // Take accelerometers out of standby and configure
-  configure_accels(&hspi1, &hspi3);
+  //configure_accels(&hspi1, &hspi3);
 
   
-  samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
+  //samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
 
   //HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], samples_to_read);
 
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
+  
   tx_buff[0] = 0x3A | 0x80;
 
 
 
 
+extern char SDPath[4];   /* SD logical drive path */
+extern FATFS SDFatFS;    /* File system object for SD logical drive */
+extern FIL SDFile;      /* File object for SD */
 
 
 
   // test write to sd card
-  FRESULT res = f_mount(&myFATFS, "", 1);
+  FRESULT res = f_mount(&SDFatFS, SDPath, 0);
+
+  HAL_Delay(300);
   if (res != FR_OK) {
     if (res == FR_NOT_READY) {
-      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
       HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
     }
   }
-
-  // 1. Mount the drive
-  if (f_mount(&myFATFS, "", 1) == FR_OK) {
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
-      
-      // 2. Open file for writing (create if not existing, write to end or overwrite)
-      // Use FA_OPEN_APPEND to append, or (FA_CREATE_ALWAYS | FA_WRITE) to overwrite
-      if (f_open(&myFile, "log.txt", FA_OPEN_APPEND | FA_WRITE) == FR_OK) {
-        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
-          
-          // 3. Write data to the file
-          f_write(&myFile, logData, strlen(logData), &bytesWritten);
+  else{
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
+  }
+  
+  //f_mount(&SDFatFS, SDPath, 1);
+ // f_open(&SDFile, "testfile.txt", FA_CREATE_ALWAYS | FA_WRITE);
+ // f_write(&SDFile, logData, strlen(logData), &bytesWritten);
           
           // 4. Close the file to flush the buffer and save changes
-          f_close(&myFile);
+  //f_close(&SDFile);
+  // 1. Mount the drive
+  //if (f_mount(&SDFatFS, (TCHAR const*)SDPath, 1) == FR_OK) {
+    
+      // 2. Open file for writing (create if not existing, write to end or overwrite)
+      // Use FA_OPEN_APPEND to append, or (FA_CREATE_ALWAYS | FA_WRITE) to overwrite
+      if (f_open(&SDFile, "log.txt", FA_OPEN_APPEND | FA_WRITE) == FR_OK) {
+          HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+          
+          // 3. Write data to the file
+          f_write(&SDFile, logData, strlen(logData), &bytesWritten);
+          
+          // 4. Close the file to flush the buffer and save changes
+          f_close(&SDFile);
       }
       // 5. Unmount the drive (optional, if you are done using the card)
-      f_mount(NULL, "", 0);
-  }
+     
+  //}
+   f_mount(NULL, (TCHAR const*)SDPath, 0);
 
 
 
@@ -345,7 +370,7 @@ int main(void)
 
   while(1){
 
-    HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 2);
+   // HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], 2);
     //read_accels(&hspi1, &hspi3, &rx_buff[0]);
     //samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
 
@@ -614,7 +639,7 @@ static void MX_I2C1_SMBUS_Init(void)
   */
 static void MX_SDMMC1_SD_Init(void)
 {
-
+ //  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
   /* USER CODE BEGIN SDMMC1_Init 0 */
 
   /* USER CODE END SDMMC1_Init 0 */
@@ -625,20 +650,21 @@ static void MX_SDMMC1_SD_Init(void)
   hsd1.Instance = SDMMC1;
   hsd1.Init.ClockEdge = SDMMC_CLOCK_EDGE_RISING;
   hsd1.Init.ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_DISABLE;
-  hsd1.Init.BusWide = SDMMC_BUS_WIDE_4B;
-  //hsd1.Init.BusWide = SDMMC_BUS_WIDE_1B;
+  //hsd1.Init.BusWide = SDMMC_BUS_WIDE_4B;
+  hsd1.Init.BusWide = SDMMC_BUS_WIDE_1B;
   hsd1.Init.HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd1.Init.ClockDiv = 4;
+  hsd1.Init.ClockDiv = 16;
   if (HAL_SD_Init(&hsd1) != HAL_OK)
   {
+
     Error_Handler();
-  }
-  if (HAL_SD_ConfigWideBusOperation(&hsd1, SDMMC_BUS_WIDE_4B) != HAL_OK) {
-    Error_Handler();
+    
   }
 
   /* USER CODE BEGIN SDMMC1_Init 2 */
-
+  if (HAL_SD_ConfigWideBusOperation(&hsd1, SDMMC_BUS_WIDE_4B) != HAL_OK) {
+    Error_Handler();
+  }
   /* USER CODE END SDMMC1_Init 2 */
 
 }
