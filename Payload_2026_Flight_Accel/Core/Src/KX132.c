@@ -26,44 +26,45 @@ void configure_cntl1(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   tx_buff[0] = 0x18; // CNTL1 buffer
   tx_buff[1] =  0b11001000; // high power, high res, interrupt off, +/- 4g range (pg 15 of datasheet), 0, wake up off, 0
 
+
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J4 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
   // J6 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
 
   // J7 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J8 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 
   // J9 Accelerometer
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 
   // J10 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
 
   // J11 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
 }
 
@@ -77,42 +78,42 @@ void put_in_standby(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J4 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
   // J6 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
 
   // J7 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J8 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 
   // J9 Accelerometer
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 
   // J10 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
 
   // J11 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
 }
 
@@ -126,42 +127,42 @@ void configure_buff_cntl1(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) 
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J4 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
   // J6 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
 
   // J7 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J8 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 
   // J9 Accelerometer
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 
   // J10 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
 
   // J11 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
 }
 
@@ -176,42 +177,42 @@ void configure_buff_cntl2(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) 
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J4 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
 
   // J6 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
 
   // J7 Accelerometer
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_4, GPIO_PIN_SET);
 
   // J8 Accelerometer
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
 
   // J9 Accelerometer
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_15, GPIO_PIN_SET);
 
   // J10 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi3, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi3, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_8, GPIO_PIN_SET);
 
   // J11 Accelerometer
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi1, &tx_buff[0], &rx_buff[0], 2, 200);
+  HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
 }
 
