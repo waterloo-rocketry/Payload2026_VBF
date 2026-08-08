@@ -60,7 +60,7 @@ extern uint8_t rx_buff_stat[2];
 
 extern uint16_t curr_frame;
 extern uint8_t curr_accelerometer;
-extern uint8_t bytes_to_read;
+extern uint16_t bytes_to_read;
 extern uint8_t *write_address;
 extern uint8_t *read_address;
 

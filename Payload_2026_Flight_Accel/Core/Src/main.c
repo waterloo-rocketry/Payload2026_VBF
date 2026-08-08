@@ -91,8 +91,8 @@ uint8_t rx_accel[8][300] = {0x00};
 
 uint8_t *write_address = &buffer_A[0]; // will start as address of buffer_A and continue through during every accelerometer reset. Will switch to buffer_B once A is full and repeat
 uint8_t *read_address;
-uint8_t bytes_to_read;
-uint8_t bytes_to_sd;
+uint16_t bytes_to_read;
+uint16_t bytes_to_sd;
 
 uint8_t curr_accelerometer = 0;
 
@@ -100,7 +100,7 @@ bool read_buffer_A = 0;
 bool read_buffer_B = 0;
 
 UINT bytesWritten = 0;
-uint8_t total_bytes_written = 0;
+uint16_t total_bytes_written = 0;
 
 typedef struct
 {
@@ -257,7 +257,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-  tx_accel[0] = 0x3C | 0x80;
+  tx_accel[0] = 0x3F | 0x80;
   tx_buff[0] = ACCEL_READ_CMD | ACCEL_DATA_START;
  
   write_address = &buffer_A[0];
@@ -393,6 +393,7 @@ int main(void)
       // 2. Open file for writing (create if not existing, write to end or overwrite)
       // Use FA_OPEN_APPEND to append, or (FA_CREATE_ALWAYS | FA_WRITE) to overwrite
       if (f_open(&SDFile, "log.bin", FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
+          f_write(&SDFile, &logData[0], sizeof(logData), &bytesWritten);
           HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
         
       }
@@ -412,15 +413,12 @@ int main(void)
     HAL_Delay(200);
   }*/
   
- // 4. Close the file to flush the buffer and save changes
-      f_close(&SDFile);
+    
 
-      // 5. Unmount the drive (optional, if you are done using the card)
-      f_mount(NULL, (TCHAR const*)SDPath, 0);
-  
+
   
   while(1){
-
+  total_bytes_written++;
     /*
   tx_accel[0] = 0x0F | 0x80;
   tx_accel[1] = 0x00;
@@ -434,19 +432,18 @@ int main(void)
   /*
   check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &rx_buff[0]);
   HAL_Delay(100);
-  */
 
 
 
-
+*/
 
 
   
   // Sample new accelerometer every time around 
-  HAL_GPIO_WritePin(accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, GPIO_PIN_RESET);
+  if(bytes_to_read > 1){  HAL_GPIO_WritePin(accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, GPIO_PIN_RESET);
   HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_accel[curr_accelerometer][0], bytes_to_read, 500);
   HAL_GPIO_WritePin(accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, GPIO_PIN_SET);
- 
+  }
   // If we do not loop around
   if(curr_accelerometer < 3){
     curr_accelerometer++;
@@ -456,21 +453,21 @@ int main(void)
   else{
     // Load into next buffer
 
-    int i = 1;
-    int j = 0;
-    for (j=0; j < 3; j++) {
-      for (i=1; i < bytes_to_read; i+=6) {
-          write_address+= 6;
+
+    for (int j=0; j < 3; j++) {
+      for (int i=1; i < bytes_to_read; i+=6) {
+          write_address+= sizeof(uint8_t)*6;
+          bytes_to_sd +=6;
           memcpy(write_address, &rx_accel[j][i], 6);
       }
     }
     
     // Check if write address has crossed threshold
-    if((write_address - read_address) > 5420){
+    if((bytes_to_sd) > 5420){
 
-      bytes_to_sd = write_address - read_address;
+      //bytes_to_sd = write_address - read_address;
 
-      if((read_address == &buffer_A)){
+      if((read_address == &buffer_A[0])){
         HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
         HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
         read_buffer_A = 1;
@@ -486,35 +483,40 @@ int main(void)
       }
       
     }
-    else{
-      // If we haven't crossed the threshold, just update the write address to be where the for loop nest ended.
-      //write_address += ((8*(i-1)) + 6*j);
-    }
+  
 
     // Reset accelerometers and check buffer status
     curr_accelerometer = 0;
-    bytes_to_read = check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &buff_status_buff[0]);
+    bytes_to_read = 1 + ((check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &buff_status_buff[0])/6) * 6);
   
 
 
   //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
     if(read_buffer_A){
       read_buffer_A = 0;
-      //f_write(&SDFile, &buffer_A[0], bytes_to_sd, &bytesWritten);
+      f_write(&SDFile, &buffer_A[0], bytes_to_sd, &bytesWritten);
+      bytes_to_sd = 0;
     }
     if(read_buffer_B){
       read_buffer_B = 0;
-     // f_write(&SDFile, &buffer_B[0], bytes_to_sd, &bytesWritten);
+      f_write(&SDFile, &buffer_B[0], bytes_to_sd, &bytesWritten);
+      bytes_to_sd = 0;
     }
 
-  total_bytes_written++;
-  if(total_bytes_written > 1000){
-     
+ 
+    if(total_bytes_written > 10000){
+      // 4. Close the file to flush the buffer and save changes
+      f_close(&SDFile);
 
-  }
+      // 5. Unmount the drive (optional, if you are done using the card)
+      f_mount(NULL, (TCHAR const*)SDPath, 0);
+    
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+    }
     
 
   }
+   
 }
   
  /* Infinite loop */
