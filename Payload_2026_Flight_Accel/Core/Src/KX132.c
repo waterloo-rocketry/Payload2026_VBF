@@ -173,7 +173,7 @@ void configure_buff_cntl2(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) 
   
   // Configure to leave standby mode
   tx_buff[0] = 0x3B; // BUFF_CNTL2 address, in Write mode 
-  tx_buff[1] = 0b11000001; // enabled, 16 bit resolution, stream mode
+  tx_buff[1] = 0b11000000; // enabled, 16 bit resolution, stream mode
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -222,7 +222,7 @@ void configure_odcntl(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   
   // Configure Output Data Rate
   tx_buff[0] = 0x1B; // ODCNTL buffer
-  tx_buff[1] =  0b01001111; // low pass roll of set to ODR/2, ODR set to 25600Hz
+  tx_buff[1] =  0b010001100; // low pass roll of set to ODR/2, ODR set to 12.8kHz
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -274,7 +274,7 @@ void configure_accels(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   configure_buff_cntl2(phspi1, phspi3); //configure buffer behaviour
 
 
-  //configure_cntl1(phspi1, phspi3);// Configure accelerometer sampling behaviour. Takes accels out of standby mode, do not reconfigure after this
+  configure_cntl1(phspi1, phspi3);// Configure accelerometer sampling behaviour. Takes accels out of standby mode, do not reconfigure after this
 }
 
 
@@ -366,13 +366,14 @@ void check_buff_cntl1_configuration(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_SET);
 }
 
-uint8_t check_buff_status(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO, uint16_t pin, uint8_t* rx_buff) {
-  uint8_t tx_buff[2] = {0x00};
-  tx_buff[0] = 0x3C | 0x80; // reading from buffer status register
+uint8_t check_buff_status(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO, uint16_t pin, uint8_t* rx_buff_address) {
+  uint8_t tx_buff_stat[2] = {0x00};
+  tx_buff_stat[0] = 0x3C | 0x80; // reading from buffer status register
+  uint8_t rx_buff_stat[2];
 
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive_IT(phspi, &tx_buff[0], rx_buff, 2);
+  HAL_SPI_TransmitReceive(phspi, &tx_buff_stat[0], &rx_buff_stat[0], 2, 500);
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_SET);
 
-  return rx_buff[1] & 0b0111111;
+  return rx_buff_stat[1];
 }

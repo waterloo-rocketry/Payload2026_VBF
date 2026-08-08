@@ -83,6 +83,56 @@ DMA_HandleTypeDef hdma_spi3_rx;
 
 /* USER CODE BEGIN PV */
 
+uint8_t buffer_A[40000]; 
+uint8_t buffer_B[40000];
+
+uint8_t tx_accel[300] = {0x00};
+uint8_t rx_accel[8][300] = {0x00};
+
+uint8_t *write_address = &buffer_A[0]; // will start as address of buffer_A and continue through during every accelerometer reset. Will switch to buffer_B once A is full and repeat
+uint8_t *read_address;
+uint8_t bytes_to_read;
+uint8_t bytes_to_sd;
+
+uint8_t curr_accelerometer = 0;
+
+bool read_buffer_A = 0;
+bool read_buffer_B = 0;
+
+UINT bytesWritten = 0;
+uint8_t total_bytes_written = 0;
+
+typedef struct
+{
+    int8_t accel_ID;
+    GPIO_TypeDef *CS_PORT;
+    uint16_t CS_PIN;
+} Accelerometer_IDs;
+
+Accelerometer_IDs accel_id_set[8] =
+{
+    // SPI1
+    {1, GPIOC, GPIO_PIN_5},
+    {2, GPIOC, GPIO_PIN_4},
+    {3, GPIOB, GPIO_PIN_2},
+    {4, GPIOE, GPIO_PIN_9},
+
+    // SPI3
+    {5, GPIOD, GPIO_PIN_4},
+    {6, GPIOB, GPIO_PIN_0},
+    {7, GPIOA, GPIO_PIN_15},
+    {8, GPIOE, GPIO_PIN_8},
+};
+
+
+
+
+/*uint8_t tx_dma[43];
+uint8_t buffer_1[6100] // 40800 kB buffer, for 10 000 sample frames plus margin
+uint8_t end_indicator[101] = {0xAA};
+        end_indicator[50] = 0x55; 
+uint8_t tx_buff_stat[2];
+uint8_t rx_buff_stat[2];*/
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -113,6 +163,8 @@ volatile bool seen_can_msg = false;
 uint8_t tx_buff[7] = {0x00};
 uint8_t rx_buff[7];
 
+uint8_t buff_status_buff[2];
+
 uint8_t samples_to_read;
 uint8_t *temp_address;
 
@@ -121,7 +173,7 @@ char logData[] = "Transmitted\r\n";
 extern char SDPath[4];   /* SD logical drive path */
 extern FATFS SDFatFS;    /* File system object for SD logical drive */
 extern FIL SDFile;      /* File object for SD */
-UINT bytesWritten;
+
 uint8_t bytes_total = 0;
 
 
@@ -131,7 +183,8 @@ uint8_t bytes_total = 0;
 
 
 
-/* USER CODE BEGIN 0 */
+
+
 void can_callback(const can_msg_t *msg) {
   seen_can_msg = true;
   /*if (get_board_type_unique_id(msg) == BOARD_TYPE_UNIQUE_ID) {
@@ -204,8 +257,11 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
- tx_buff[0] = ACCEL_READ_CMD | ACCEL_DATA_START;
+  tx_accel[0] = 0x3C | 0x80;
+  tx_buff[0] = ACCEL_READ_CMD | ACCEL_DATA_START;
  
+  write_address = &buffer_A[0];
+  read_address = write_address;
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -282,13 +338,38 @@ int main(void)
    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_SET); 
     HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_SET);
 
   HAL_Delay(500);
 
 
   // Take accelerometers out of standby and configure
+/*
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  tx_accel[0] = 0x18;
+  tx_accel[1] = 0x00;
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, &tx_accel[0], 2 , 500);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
+  //configure_accels(&hspi1, &hspi3);
+
+    
+
+
+  tx_accel[0] = 0x3B;
+  tx_accel[1] = 0b11000000;
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, &tx_accel[0], 2 , 500);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
+
+
+  tx_accel[0] = 0x18;
+  tx_accel[1] = 0b11001000;
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(&hspi1, &tx_accel[0], 2 , 500);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);*/
   //configure_accels(&hspi1, &hspi3);
 
   
@@ -299,8 +380,6 @@ int main(void)
   
   //tx_buff[0] = 0x3A | 0x80;
 
-tx_buff[0] = 0b10000001;
-char tx_str[8];
 
 
 
@@ -315,141 +394,141 @@ char tx_str[8];
       // Use FA_OPEN_APPEND to append, or (FA_CREATE_ALWAYS | FA_WRITE) to overwrite
       if (f_open(&SDFile, "log.bin", FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
           HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
-          
-          // 3. Write data to the file
-         //f_write(&SDFile, &tx_buff[0], 7, &bytesWritten);
-         if (bytesWritten >=7){
-          //HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
-         }
-          
-          // 4. Close the file to flush the buffer and save changes
-          
+        
       }
-      // 5. Unmount the drive (optional, if you are done using the card)
-     
   }
-  //f_mount(NULL, (TCHAR const*)SDPath, 0);
 
+  configure_accels(&hspi1, &hspi3);
 
+  /*for(int i = 0; i < 100; i++){
+    tx_accel[0] = 0x3C | 0x80;
+    tx_accel[1] = 0b11000000;
 
-// BEGIN TESTING ACCELEROMETERS
+    check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &rx_accel[0][0]);
+    //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
+    //HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_buff[0], 2 , 500);
+    //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET);
 
-tx_buff[0] = 0x3B ; // Buff_cntl2 address, in write mode 
-tx_buff[1] = 0xc1;
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &tx_buff[0], 2, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
+    HAL_Delay(200);
+  }*/
+  
+ // 4. Close the file to flush the buffer and save changes
+      f_close(&SDFile);
 
-
-tx_buff[0] = 0x18; // CNTL1 buffer
-tx_buff[1] =  0b11001000; // high power, high res, interrupt off, +/- 4g range (pg 15 of datasheet), 0, wake up off, 0
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &tx_buff[0], 2, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
-
-// Write the register value to sd card to view it
-
-
-
-tx_buff[0] = 0x3B | 0x80 ; // Buff_cntl2 address, read mode 
-tx_buff[1] = 0x00;
-
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(&hspi1, &tx_buff[0], &rx_buff[0], 2, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
-
-
-f_write(&SDFile, &rx_buff[1], 1, &bytesWritten);
-f_close(&SDFile);
-f_mount(NULL, (TCHAR const*)SDPath, 0);
-//HAL_SPI_Transmit_IT(&hspi1, &tx_buff[0], 7);
-
-tx_buff[0] = 0x3F | 0x80 ; // Buff_read address, read mode 
-tx_buff[1] = 0x00;
-tx_buff[2] = 0x00;
-
-HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(&hspi1, &tx_buff[0], &rx_buff[0], 7, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
-
-  f_write(&SDFile, &rx_buff[1], 6, &bytesWritten);
-
-  HAL_Delay(500);
-
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(&hspi1, &tx_buff[0], &rx_buff[0], 7, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
-
-  f_write(&SDFile, &rx_buff[1], 6, &bytesWritten);
-
-  HAL_Delay(500);
-
-
-f_close(&SDFile);
-f_mount(NULL, (TCHAR const*)SDPath, 0);
-
+      // 5. Unmount the drive (optional, if you are done using the card)
+      f_mount(NULL, (TCHAR const*)SDPath, 0);
+  
+  
   while(1){
 
-   //HAL_SPI_TransmitReceive(&hspi1, &tx_buff[0], &rx_buff[0], 2, 500);
-    //HAL_SPI_Transmit_IT(&hspi1, &tx_buff[0], 7);
-    //read_accels(&hspi1, &hspi3, &rx_buff[0]);
-    //samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
-    //check_buff_cntl1_configuration(&hspi1, GPIOC, GPIO_PIN_5, &rx_buff[0]);
+    /*
+  tx_accel[0] = 0x0F | 0x80;
+  tx_accel[1] = 0x00;
+  HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_buff[0], 2 , 500);
+  //uint8_t temp_buff_status = rx_accel[curr_accelerometer][0];
+*/
+  /*for(int i = 0; i < temp_buff_status; i++){
+    HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED1_PIN);
+    HAL_Delay(200);
+  }*/
+  /*
+  check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &rx_buff[0]);
+  HAL_Delay(100);
+  */
 
-   //10110011
-   //00100011
-   //0001110111111000
-   //0110011000000000
-   //0101011100000000
-   //01000110
-// J6 Accelerometer
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(&hspi1, &tx_buff[0], &rx_buff[0], 7, 500);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
 
-  HAL_Delay(500);
+
+
+
+
+  
+  // Sample new accelerometer every time around 
+  HAL_GPIO_WritePin(accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, GPIO_PIN_RESET);
+  HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_accel[curr_accelerometer][0], bytes_to_read, 500);
+  HAL_GPIO_WritePin(accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, GPIO_PIN_SET);
+ 
+  // If we do not loop around
+  if(curr_accelerometer < 3){
+    curr_accelerometer++;
+  }
+
+  // This is what happens when we have one full sample of 8 accelerometers
+  else{
+    // Load into next buffer
+
+    int i = 1;
+    int j = 0;
+    for (j=0; j < 3; j++) {
+      for (i=1; i < bytes_to_read; i+=6) {
+          write_address+= 6;
+          memcpy(write_address, &rx_accel[j][i], 6);
+      }
+    }
+    
+    // Check if write address has crossed threshold
+    if((write_address - read_address) > 5420){
+
+      bytes_to_sd = write_address - read_address;
+
+      if((read_address == &buffer_A)){
+        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+        read_buffer_A = 1;
+        write_address = &buffer_B[0];
+        read_address = &buffer_B[0]; 
+      }
+      else {
+        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
+        read_buffer_B = 1;
+        write_address = &buffer_A[0];
+        read_address = &buffer_A[0];
+      }
+      
+    }
+    else{
+      // If we haven't crossed the threshold, just update the write address to be where the for loop nest ended.
+      //write_address += ((8*(i-1)) + 6*j);
+    }
+
+    // Reset accelerometers and check buffer status
+    curr_accelerometer = 0;
+    bytes_to_read = check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &buff_status_buff[0]);
+  
+
+
+  //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_5, GPIO_PIN_SET); // J6 Chip Select
+    if(read_buffer_A){
+      read_buffer_A = 0;
+      //f_write(&SDFile, &buffer_A[0], bytes_to_sd, &bytesWritten);
+    }
+    if(read_buffer_B){
+      read_buffer_B = 0;
+     // f_write(&SDFile, &buffer_B[0], bytes_to_sd, &bytesWritten);
+    }
+
+  total_bytes_written++;
+  if(total_bytes_written > 1000){
+     
+
+  }
     
 
   }
-  /* Infinite loop */
+}
+  
+ /* Infinite loop */
   /* USER CODE BEGIN WHILE */
- 
   /* USER CODE END 3 */
 }
-void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi){
 
-  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
-  //HAL_Delay(300);
-  f_write(&SDFile, &tx_buff[0], 7, &bytesWritten);
-  bytes_total += bytesWritten;
-
-  if(bytes_total < 21){
-    HAL_SPI_Transmit_IT(&hspi1, &tx_buff[0], 7);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
-
-  }
-  else{
-  f_close(&SDFile);
-  f_mount(NULL, (TCHAR const*)SDPath, 0);
-  HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
-  }
-}
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 
-  HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED5_PIN);
+  //HAL_GPIO_TogglePin(LED_GPIO_PORTS, LED5_PIN);
 
-  //f_write(&SDFile, rx_buff, sizeof(rx_buff), &bytesWritten);
-  //f_close(&SDFile);
-  //samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
 
-  //samples_to_read = check_buff_status(&hspi1, GPIOB, GPIO_PIN_2, &rx_buff[0]);
+}   
 
-  //HAL_SPI_TransmitReceive_IT(&hspi1, &tx_buff[0], &rx_buff[0], samples_to_read);
-  
-    
-    
- // }
-}
 /**
   * @brief System Clock Configuration
   * @retval None
@@ -746,7 +825,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -794,7 +873,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_16;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;

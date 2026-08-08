@@ -52,6 +52,18 @@ extern "C" {
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+extern uint8_t tx_dma[43];
+extern uint8_t buffer_1[6100]; // 40800 kB buffer, for 10 000 sample frames plus margin
+extern uint8_t end_indicator;
+extern uint8_t tx_buff_stat[2];
+extern uint8_t rx_buff_stat[2];
+
+extern uint16_t curr_frame;
+extern uint8_t curr_accelerometer;
+extern uint8_t bytes_to_read;
+extern uint8_t *write_address;
+extern uint8_t *read_address;
+
 
 /* USER CODE END EC */
 
