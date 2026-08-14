@@ -173,7 +173,7 @@ void configure_buff_cntl2(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) 
   
   // Configure to leave standby mode
   tx_buff[0] = 0x3B; // BUFF_CNTL2 address, in Write mode 
-  tx_buff[1] = 0b11100000; // enabled, 16 bit resolution, stream mode
+  tx_buff[1] = 0b11100001; // enabled, 16 bit resolution, stream mode
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -267,13 +267,19 @@ void configure_odcntl(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
 
 
 void configure_accels(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
+  HAL_Delay(1000);
+
   put_in_standby(phspi1, phspi3);
 
   configure_odcntl(phspi1, phspi3); // configure output data rate
   configure_buff_cntl1(phspi1, phspi3); // configure buffer size
   configure_buff_cntl2(phspi1, phspi3); //configure buffer behaviour
 
+  configure_odcntl(phspi1, phspi3); // configure output data rate
+  configure_buff_cntl1(phspi1, phspi3); // configure buffer size
+  configure_buff_cntl2(phspi1, phspi3); //configure buffer behaviour
 
+  HAL_Delay(1000);
   configure_cntl1(phspi1, phspi3);// Configure accelerometer sampling behaviour. Takes accels out of standby mode, do not reconfigure after this
 }
 
@@ -372,7 +378,10 @@ uint8_t check_buff_status(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO, uint16_t
   uint8_t rx_buff_stat[2];
 
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_RESET);
-  HAL_SPI_TransmitReceive(phspi, &tx_buff_stat[0], &rx_buff_stat[0], 2, 500);
+  if (HAL_SPI_TransmitReceive(phspi, &tx_buff_stat[0], &rx_buff_stat[0], 2, 500) != HAL_OK) {
+    HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_5);
+    HAL_Delay(1000);
+  };
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_SET);
 
   return rx_buff_stat[1];
