@@ -1,0 +1,3 @@
+[submodule "Payload_2026_Flight_Accel/canlib"]
+	path = Payload_2026_Flight_Accel/canlib
+	url = https://github.com/waterloo-rocketry/canlib.git
