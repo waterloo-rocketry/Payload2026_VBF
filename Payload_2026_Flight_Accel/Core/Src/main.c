@@ -87,12 +87,13 @@ uint8_t buffer_A[40000];
 uint8_t buffer_B[40000];
 
 uint8_t tx_accel[300] = {0x00};
-uint8_t rx_accel[8][2410] = {0x00};
+uint8_t rx_accel[8][241] = {0x00};
 
 uint8_t *write_address = &buffer_A[0]; // will start as address of buffer_A and continue through during every accelerometer reset. Will switch to buffer_B once A is full and repeat
 uint8_t *read_address;
 uint16_t write_index = 0;
 uint16_t bytes_to_read;
+uint16_t check_bytes;
 uint16_t bytes_to_sd;
 
 uint8_t curr_accelerometer = 0;
@@ -101,7 +102,7 @@ bool read_buffer_A = 0;
 bool read_buffer_B = 0;
 
 UINT bytesWritten = 0;
-uint16_t total_bytes_written = 0;
+uint32_t total_bytes_written = 0;
 
 can_actuator_id_t actuator_id;
 bool begin_reading = 0;
@@ -255,12 +256,12 @@ void can_callback(const can_msg_t *msg) {
     
     switch(actuator_id){
     case(ACTUATOR_IGNITION):
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
-    begin_reading = 1;
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_SET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED4_PIN, GPIO_PIN_RESET);
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
+      begin_reading = 1;
       break;
 
     case(ACTUATOR_CAMERA_SIDE_LOOKING_RECORD):
@@ -274,7 +275,18 @@ void can_callback(const can_msg_t *msg) {
     case(ACTUATOR_PAYLOAD_LOGGING_ENABLE):
       begin_reading = 1;
       break;
-
+    
+    case(ACTUATOR_OX_INJECTOR_VALVE):
+      begin_reading = 1;
+      break;
+    
+    case(ACTUATOR_PAYLOAD_SD_CLEAR): // NOT USING TO CLEAR SD CARD JUST TO STOP LOGGING BECAUSE THERE IS NOT A DEDICATED STOP LOGGING COMMAND
+      begin_reading = 0;
+      f_close(&SDFile);
+      f_mount(NULL, (TCHAR const*)SDPath, 0);
+      
+      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+      break;
     default:
       break;
   }
@@ -326,6 +338,7 @@ int main(void)
  
   write_address = &buffer_A[0];
   read_address = write_address;
+  total_bytes_written = 0;
   /* USER CODE END 1 */
 
   /* MPU Configuration--------------------------------------------------------*/
@@ -350,7 +363,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_FDCAN1_Init();
+  //MX_FDCAN1_Init();
   MX_I2C1_SMBUS_Init();
   MX_SDMMC1_SD_Init();
   MX_ADC1_Init();
@@ -362,7 +375,7 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 
-  stm32h7_can_init(&hfdcan1, &can_callback);
+  // stm32h7_can_init(&hfdcan1, &can_callback);
 
   const can_msg_t LED_ON_MESSAGE; 
   const can_msg_t LED_OFF_MESSAGE; 
@@ -456,7 +469,7 @@ int main(void)
     
       // 2. Open file for writing (create if not existing, write to end or overwrite)
       // Use FA_OPEN_APPEND to append, or (FA_CREATE_ALWAYS | FA_WRITE) to overwrite
-      if (f_open(&SDFile, "log2.bin", FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
+      if (f_open(&SDFile, "Paylog.bin", FA_OPEN_APPEND | FA_WRITE) == FR_OK) {
           
           HAL_GPIO_WritePin(LED_GPIO_PORTS, LED1_PIN, GPIO_PIN_RESET);
         
@@ -465,60 +478,96 @@ int main(void)
   HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
   configure_accels(&hspi1, &hspi3);
 
-  
+  curr_accelerometer = 0;
+
   while(1){
 
-  bytes_to_read = 1 + ((check_buff_status(&hspi1, GPIOC, GPIO_PIN_5, &buff_status_buff[0])/6) * 6);
+  bytes_to_read = ((check_buff_status(&hspi1, accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, &buff_status_buff[0]))/6) * 6;
+  /*
+  for (int i = 0; i < 4; i ++){
+    if((check_buff_status(&hspi1, accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, &buff_status_buff[0])) == 0){
+      configure_one_accel(&hspi1, accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN);
+    }
+  }
+  for (int i = 4; i < 8; i++){
+    if((check_buff_status(&hspi1, accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, &buff_status_buff[0])) == 0){
+    configure_one_accel(&hspi3, accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN);
+    }
+  }
+  */
+  
+  while(bytes_to_read == 0){
+      if (curr_accelerometer == 7){
+        curr_accelerometer = 0;
+      }
+      else{
+        curr_accelerometer++;
+      }
+
+      if(curr_accelerometer < 4){
+      bytes_to_read = (check_buff_status(&hspi1, accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, &buff_status_buff[0]));
+      }
+      else{
+      bytes_to_read = (check_buff_status(&hspi3, accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, &buff_status_buff[0]));
+      }
+    }
+      
+  //bytes_to_read = (check_buff_status(&hspi1, accel_id_set[curr_accelerometer].CS_PORT, accel_id_set[curr_accelerometer].CS_PIN, &buff_status_buff[0]));
+
   HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
   if(bytes_to_read > 240){
     for (int i = 0; i < 4; i++){
       
       HAL_GPIO_WritePin(accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, GPIO_PIN_RESET);
-      HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_accel[i][write_index], 61, 500);
+      HAL_SPI_TransmitReceive(&hspi1, &tx_accel[0], &rx_accel[i][write_index], 241, 500);
       HAL_GPIO_WritePin(accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, GPIO_PIN_SET);
 
       
     }
+    check_buff_status(&hspi3, accel_id_set[4].CS_PORT, accel_id_set[4].CS_PIN, &buff_status_buff[0]);
     for (int i = 4; i < 8; i++){
       HAL_GPIO_WritePin(accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, GPIO_PIN_RESET);
-      HAL_SPI_TransmitReceive(&hspi3, &tx_accel[0], &rx_accel[i][write_index], 61, 500);
+      HAL_SPI_TransmitReceive(&hspi3, &tx_accel[0], &rx_accel[i][write_index], 241, 500);
       HAL_GPIO_WritePin(accel_id_set[i].CS_PORT, accel_id_set[i].CS_PIN, GPIO_PIN_SET);
     }
-
-    write_index += 121;
-  }
-
-  
-  if(write_index >= 121*3){
+   
 
     // Set write index to start filling buffer with new data (overwrite old)
     write_index = 0;
 
     // SD card write operation
-    bytes_to_sd = 121*8;
-    HAL_GPIO_WritePin(LED_GPIO_PORTS, LED2_PIN, GPIO_PIN_RESET);
+    bytes_to_sd = 241*8;
    
-
-
+   
     // Close SD card if enough data has been collected
-    if(total_bytes_written >= 241){
-
-      f_close(&SDFile);
-      f_mount(NULL, (TCHAR const*)SDPath, 0);
     
-      HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+      
+      if(total_bytes_written >= 96000000){
+        begin_reading = 0;
+        f_close(&SDFile);
+        f_mount(NULL, (TCHAR const*)SDPath, 0);
+      
+        HAL_GPIO_WritePin(LED_GPIO_PORTS, LED5_PIN, GPIO_PIN_RESET);
 
-    }
-    else{
-      for(int k = 0; k < 8; k++){
-      f_write(&SDFile, &rx_accel[k][3], 121, &bytesWritten);
       }
-      //f_write(&SDFile, &rx_accel[1][1], 241, &bytesWritten);
-      total_bytes_written += bytesWritten;
-    }
+      else{
+        for (int k = 0; k < 8; k++){
+          f_write(&SDFile, &rx_accel[k][1], 241, &bytesWritten);
+         
+        }
+        f_sync(&SDFile);
+        //HAL_GPIO_WritePin(LED_GPIO_PORTS, LED3_PIN, GPIO_PIN_RESET);
+        
+        //f_write(&SDFile, &rx_accel[1][1], 241, &bytesWritten);
+        total_bytes_written += bytesWritten;
+      }
+     
     
   }
-}
+
+  
+
+  }
   
  /* Infinite loop */
   /* USER CODE BEGIN WHILE */

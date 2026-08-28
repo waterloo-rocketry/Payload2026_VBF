@@ -24,7 +24,7 @@ void configure_cntl1(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   
   // Configure to leave standby mode
   tx_buff[0] = 0x18; // CNTL1 buffer
-  tx_buff[1] =  0b11001000; // high power, high res, interrupt off, +/- 4g range (pg 15 of datasheet), 0, wake up off, 0
+  tx_buff[1] =  0b11011000; // high power, high res, interrupt off, +/- 4g range (pg 15 of datasheet), 0, wake up off, 0
 
 
   // J3 Accelerometer
@@ -74,7 +74,7 @@ void put_in_standby(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   
   // Configure to leave standby mode
   tx_buff[0] = 0x18; // CNTL1 buffer
-  tx_buff[1] =  0b00000000; // high power, high res, interrupt off, +/- 4g range (pg 15 of datasheet), 0, wake up off, 0
+  tx_buff[1] =  0b00000000; // high power, high res, interrupt off, +/- 16g range (pg 15 of datasheet), 0, wake up off, 0
 
   // J3 Accelerometer
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_4, GPIO_PIN_RESET);
@@ -215,6 +215,7 @@ void configure_buff_cntl2(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) 
   HAL_SPI_Transmit(phspi1, &tx_buff[0], 2, 200);
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, GPIO_PIN_SET);
 }
+
 
 void configure_odcntl(SPI_HandleTypeDef* phspi1, SPI_HandleTypeDef* phspi3) {
   uint8_t tx_buff[2] = {0x00};
@@ -397,4 +398,48 @@ uint8_t check_buff_full_status(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO, uin
   HAL_GPIO_WritePin(GPIO, pin, GPIO_PIN_SET);
 
   return rx_buff_stat[1];
+}
+
+void configure_one_accel(SPI_HandleTypeDef* phspi, GPIO_TypeDef* GPIO, uint16_t GPIO_PIN){
+  uint8_t tx_buff[2] = {0x00};
+  
+  // PUT IN STANDBY
+  tx_buff[0] = 0x18; // CNTL1 buffer
+  tx_buff[1] =  0b00000000; 
+
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(phspi, &tx_buff[0], 2, 200);
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_SET);
+
+  // CONFIGURE ODCNTL
+  tx_buff[0] = 0x1B; // ODCNTL buffer
+  tx_buff[1] =  0b010001100; // low pass roll of set to ODR/2, ODR set to 6.4kHz
+
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(phspi, &tx_buff[0], 2, 200);
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_SET);
+  
+  // CONFIGURE BUFF_CNTL1
+  tx_buff[0] = 0x3A; // BUFF_CNTL1 address, in Write mode 
+  tx_buff[1] =  0x2B; // 43 byte buffer max for 16 bit resolution
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(phspi, &tx_buff[0], 2, 200);
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_SET);
+
+  // CONFIGURE BUFF_CNTL2
+  tx_buff[0] = 0x3B; // BUFF_CNTL2 address, in Write mode 
+  tx_buff[1] = 0b11100001; // enabled, 16 bit resolution, stream mode
+
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(phspi, &tx_buff[0], 2, 200);
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_SET);
+
+  // SET ACCELEROMETER AND TAKE OUT OF STANDBY
+  tx_buff[0] = 0x18; // CNTL1 buffer
+  tx_buff[1] =  0b11011000; // high power, high res, interrupt off, +/- 16g range (pg 15 of datasheet), 0, wake up off, 0
+
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_RESET);
+  HAL_SPI_Transmit(phspi, &tx_buff[0], 2, 200);
+  HAL_GPIO_WritePin(GPIO, GPIO_PIN, GPIO_PIN_SET);
+
 }
